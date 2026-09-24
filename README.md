@@ -51,7 +51,6 @@ Or install the .mgsv with SnakeBite. IH loads it on startup. https://www.nexusmo
 | Key | Default | Effect |
 |---|---|---|
 | `debugLog` | `false` | Pool usage every 5 s, stall and fallback lines, `TextureStreamer_boot.log`. For bug reports |
-| `debugWindow` | `false` | Live debug console (windowed or borderless only) |
 | `raiseBudget` | `true` | `false` leaves the game's budget alone (monitor only) |
 | `patchDispatch` | `true` | Remove the 3584 MB cap and forced degrade |
 | `patchUpgrade` | `true` | Raise upgrades per frame to `upgradePerFrame` |
