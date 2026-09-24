@@ -26,4 +26,4 @@ Run `BUILD_TEXTURESTREAMER_V014_CHECKED.cmd`, then with the game closed copy the
 
 Loaded: `TextureStreamer.log` starts with `[DLL] InitThread started. TEXTURESTREAMER,V0_14_20260924`.
 
-See HOW_IT_WORKS.md for the hooked functions, patched bytes and what to check in the log.
+See research.md for the hooked functions, patched bytes and what to check in the log.
