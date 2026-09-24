@@ -4,8 +4,6 @@ Infinite Heaven plugin for MGSV: The Phantom Pain (Steam 1.0.15.4 EN). It raises
 using real VRAM read from the game's swapchain, removes the 3584 MB cap and the forced degrade mode, loads
 higher quality textures faster, and fixes the small texture pool stall. It leaves the 4880 handle cap alone.
 
-Current revision: V016 (`TEXTURESTREAMER,V0_16_20260924`).
-
 Full technical write-up (addresses, bytes, decompiles, test results): [RESEARCH.md](RESEARCH.md).
 
 ## What it fixes
