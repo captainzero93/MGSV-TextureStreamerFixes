@@ -1,0 +1,2 @@
+Vendored MinHook source, TsudaKageyu/minhook commit 8af6b4a (08/09/2026), x64 files only.
+Built with the project so the objects always match the local MSVC version.
