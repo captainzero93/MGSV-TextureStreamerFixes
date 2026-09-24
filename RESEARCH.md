@@ -1,7 +1,7 @@
 # TextureStreamer research
 
-Target: MGSV TPP retail 1.0.15.4 EN, `mgsvtpp.exe` SHA256
-`085c2f82d1c963c40b3d2d55786661dfee2b18cbbf388a710c00fa76c5e9bb45`. Revision V014.
+Target: MGSV TPP retail 1.0.15.4 EN, `mgsvtpp.exe` PE header TimeDateStamp `0x6A4CB898`
+(unmodified exe SHA256 `085c2f82d1c963c40b3d2d55786661dfee2b18cbbf388a710c00fa76c5e9bb45`). Revision V016.
 
 Addresses are retail 1.0.15.4 EN (preferred base `0x140000000`), read in Ghidra unless another source is given.
 Names in quotes come from the old mgsv_mod source or the 2015 dev decomp. Retail functions are unnamed (`FUN_`).
@@ -33,7 +33,7 @@ It does not touch the handle cap or the create-time sizing (section 7).
 4. `InitThread`:
    - opens `TextureStreamer.log` beside `mgsvtpp.exe` (previous run kept as `TextureStreamer.prev.log`),
    - reads `plugins\TextureStreamer.lua` as literal `key = value` lines (never run),
-   - hashes `mgsvtpp.exe` with SHA256. Only an exact match selects the address set; any other exe installs nothing,
+   - logs the exe's PE `TimeDateStamp` and `SizeOfImage`. A TimeDateStamp other than `0x6A4CB898` logs a warning and the 1.0.15.4 EN address set is still tried. SizeOfImage is not compared, the anti-tamper wrapper (Denuvo) bloats it,
    - installs the crash logger, the Present hook, then the streamer hooks and patches. MinHook hooks are queued and applied together.
 
 The Core module rewrites its whole loader log with `"w"` for each line, as `InfCore.WriteLog` does, and never
@@ -49,6 +49,7 @@ running streamer, not at creation.
 
 ## 3. Safety rules
 
+- The PE TimeDateStamp check only warns. The per-site checks decide what gets written.
 - Every hook target is compared to the 16 bytes read from Ghidra before MinHook touches it. On a mismatch the hook is skipped and the log shows both.
 - Every byte patch has the original bytes it expects. A patch group is written all together or not at all.
 - Other threads are suspended while patch bytes are written. If a thread is stopped inside a patch site, the group is skipped.
@@ -308,9 +309,9 @@ To isolate a crash, turn off one at a time: `hookPresent`, `hookUpdate`, `hookGe
 
 Expected `TextureStreamer.log`:
 
-1. `[DLL] InitThread started. TEXTURESTREAMER,V0_14_20260924`
+1. `[DLL] InitThread started. TEXTURESTREAMER,V0_16_20260924`
 2. `[Settings] Loaded ...`, then one line with every setting
-3. `[AddressSet] mgsvtpp.exe SHA256 085c2f82...`, `Selected EN 1.0.15.4 address set.`
+3. `[AddressSet] mgsvtpp.exe TimeDateStamp 0x6A4CB898 SizeOfImage 0x...`, `Selected EN 1.0.15.4 address set.`
 4. `[CRASH] Unhandled-exception crash logger installed.`
 5. `[Vram] Present pattern @0x14024CEFC -> gn::swapchain::Present 0x1419F5990`, `[Hook] Present: OK`
 6. For each of the four hooks in 4.2: `@0x... bytes [...] matches`, `: OK`
@@ -331,6 +332,6 @@ Reading it:
 - Line 11 but no `Applied config N MB`: the request is pending. Either the gate in 4.3 is not met, or the storage allocation failed and fell back.
 - `Budget already N MB, no request`: the game's config was already at or above VRAM.
 - `MISMATCH` or `SKIPPED`: nothing was written at that site.
-- `No address set for ...`: not retail 1.0.15.4 EN, nothing installed.
+- `WARNING: exe is not the target 1.0.15.4 EN build`: different TimeDateStamp. Only the hooks and patches that say `matches` were applied.
 - No `[Vram] Resolved`: the Present hook never ran.
 - `loadlib failed` in the loader log while `TextureStreamer.log` shows the hooks: the DLL is loaded and working (everything runs from DllMain). Seen once, cause unknown.
