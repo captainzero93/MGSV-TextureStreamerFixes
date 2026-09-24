@@ -44,7 +44,7 @@ With the game closed, copy into the game folder (the one with `mgsvtpp.exe`):
 - `plugins\TextureStreamer.dll`
 - `plugins\TextureStreamer.lua`
 
-Or install the .mgsv with SnakeBite. IH loads it on startup.
+Or install the .mgsv with SnakeBite. IH loads it on startup. https://www.nexusmods.com/metalgearsolidvtpp/mods/2622 
 
 ## Settings
 
