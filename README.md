@@ -1,4 +1,4 @@
-# FOX Engine Texture Streaming Fix
+# FOX Engine Texture Streaming / Budget / Pop Fixes
 
 Infinite Heaven plugin for MGSV: The Phantom Pain (Steam 1.0.15.4 EN). It raises the texture streaming budget
 using real VRAM read from the game's swapchain, removes the 3584 MB cap and the forced degrade mode, loads
