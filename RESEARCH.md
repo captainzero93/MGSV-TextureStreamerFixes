@@ -255,6 +255,10 @@ init (`FUN_14021d2f0`). It:
 This has finished before IH loads the plugin: the first update always logs a non-null storage manager. None of it
 is hooked. The budget goes through 4.3 and the small pool limit through 6.2.
 
+The old mgsv_mod loaded before this ran and hooked Create, multiplying `total`, the small pool and `storage` by 2–6
+and the two handle values by `handle_multiplier` (default 4). That enlarged the small pool up front, but also sized
+the handle side past the 4880 arrays compiled into the streamer (7.1).
+
 ### 7.3 VRAM above 4 GB
 
 - The budget fields (`+0x30a54..+0x30a70`) are packed 4 bytes apart, so they can't be widened in place. Every read and write across the streamer and storage manager would need rewriting.
