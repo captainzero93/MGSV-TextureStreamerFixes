@@ -1,14 +1,10 @@
-// Per-build game addresses, exe hash detection, crash logger
+// Per-build game addresses, exe build detection, crash logger
 #include "pch.h"
 
 #include <Windows.h>
-#include <bcrypt.h>
-#include <cstring>
 
 #include "AddressSet.h"
 #include "log.h"
-
-#pragma comment(lib, "bcrypt.lib")
 
 static const char* const kAddrFieldNames[] = {
     "StreamerUpdate",         "GetAvailableStorageMemorySize", "RequestTextureStorageConfiguration", "TsmAllocBlock", "UpdateAvailCap",
@@ -21,51 +17,14 @@ namespace AddressSetRuntime
 {
     namespace
     {
-        // mgsvtpp.exe 1.0.15.4 EN, version_info.txt "tpp_steam_mst_en_day3900mgo_patch_0707_1632"
-        constexpr const char* kSha256_1_0_15_4_En = "085c2f82d1c963c40b3d2d55786661dfee2b18cbbf388a710c00fa76c5e9bb45";
-
-        // SHA256 of the exe file on disk, lowercase hex. Empty on failure.
-        std::string ExeSha256(HMODULE hGame)
-        {
-            wchar_t path[MAX_PATH] = {};
-            if (!GetModuleFileNameW(hGame, path, MAX_PATH))
-                return {};
-
-            HANDLE file = CreateFileW(path, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, nullptr);
-            if (file == INVALID_HANDLE_VALUE)
-                return {};
-
-            std::string hex;
-            BCRYPT_ALG_HANDLE alg = nullptr;
-            BCRYPT_HASH_HANDLE hash = nullptr;
-            if (BCRYPT_SUCCESS(BCryptOpenAlgorithmProvider(&alg, BCRYPT_SHA256_ALGORITHM, nullptr, 0))
-                && BCRYPT_SUCCESS(BCryptCreateHash(alg, &hash, nullptr, 0, nullptr, 0, 0)))
-            {
-                static unsigned char buf[1 << 20];
-                DWORD read = 0;
-                bool ok = true;
-                while (ok && ReadFile(file, buf, sizeof(buf), &read, nullptr) && read)
-                    ok = BCRYPT_SUCCESS(BCryptHashData(hash, buf, read, 0));
-
-                unsigned char digest[32];
-                if (ok && BCRYPT_SUCCESS(BCryptFinishHash(hash, digest, sizeof(digest), 0)))
-                {
-                    char h[65];
-                    for (int i = 0; i < 32; ++i)
-                        snprintf(h + i * 2, 3, "%02x", digest[i]);
-                    hex = h;
-                }
-            }
-            if (hash)
-                BCryptDestroyHash(hash);
-            if (alg)
-                BCryptCloseAlgorithmProvider(alg, 0);
-            CloseHandle(file);
-            return hex;
-        }
+        // mgsvtpp.exe 1.0.15.4 EN, version_info.txt "tpp_steam_mst_en_day3900mgo_patch_0707_1632".
+        // PE TimeDateStamp, read from the image header in Ghidra. Set by the linker per build; hex edits leave
+        // it alone. SizeOfImage is logged only, the anti-tamper wrapper changes it. Informational: a mismatch
+        // is logged and the address set is still used, since each hook and patch checks its own bytes.
+        constexpr DWORD kTimeDateStamp_1_0_15_4_En = 0x6A4CB898;
     }
 
-    // VERIFIED in Ghidra (project MGSV, program mgsvtpp.exe, retail 1.0.15.4 EN) on 24/09/2026.
+    // Read in Ghidra (project MGSV, program mgsvtpp.exe, retail 1.0.15.4 EN) on 24/09/2026.
     // Names in quotes are from the previous mgsv_mod source (inferred); the old addresses were
     // from another build, offset +0x4D0 (+0x4E0 in the update function) from these.
     const AddressSet& Get_mst_en_day3900_AddressSet() // 1.0.15.4 english
@@ -85,11 +44,17 @@ namespace AddressSetRuntime
 
     GameBuild DetectGameBuild(HMODULE hGame)
     {
-        const std::string sha = ExeSha256(hGame);
-        Log("[AddressSet] mgsvtpp.exe SHA256 %s\n", sha.empty() ? "<failed>" : sha.c_str());
-        if (sha == kSha256_1_0_15_4_En)
-            return GameBuild::En_1_0_15_4;
-        return GameBuild::Unknown;
+        const auto* dos = reinterpret_cast<const IMAGE_DOS_HEADER*>(hGame);
+        if (dos->e_magic != IMAGE_DOS_SIGNATURE)
+            return GameBuild::Unknown;
+        const auto* nt = reinterpret_cast<const IMAGE_NT_HEADERS64*>(reinterpret_cast<const BYTE*>(hGame) + dos->e_lfanew);
+        if (nt->Signature != IMAGE_NT_SIGNATURE || nt->FileHeader.Machine != IMAGE_FILE_MACHINE_AMD64)
+            return GameBuild::Unknown;
+
+        const DWORD stamp = nt->FileHeader.TimeDateStamp;
+        const DWORD size = nt->OptionalHeader.SizeOfImage;
+        Log("[AddressSet] mgsvtpp.exe TimeDateStamp 0x%08lX SizeOfImage 0x%08lX\n", static_cast<unsigned long>(stamp), static_cast<unsigned long>(size));
+        return stamp == kTimeDateStamp_1_0_15_4_En ? GameBuild::En_1_0_15_4 : GameBuild::Unknown;
     }
 
     bool ResolveAddressSet(HMODULE hGame)
@@ -98,17 +63,14 @@ namespace AddressSetRuntime
             return false;
 
         GetGameBuild() = DetectGameBuild(hGame);
+        GetAddressSet() = Get_mst_en_day3900_AddressSet();
 
-        switch (GetGameBuild())
-        {
-        case GameBuild::En_1_0_15_4:
-            GetAddressSet() = Get_mst_en_day3900_AddressSet();
-            break;
-        default:
-            GetAddressSet() = AddressSet{}; // unknown exe, install nothing
-            break;
-        }
-        Log("[AddressSet] Selected %s address set.\n", GetGameBuildName(GetGameBuild()));
+        if (GetGameBuild() == GameBuild::En_1_0_15_4)
+            Log("[AddressSet] Selected EN 1.0.15.4 address set.\n");
+        else
+            Log("[AddressSet] WARNING: exe is not the target 1.0.15.4 EN build (TimeDateStamp 0x%08lX). Trying the EN 1.0.15.4 "
+                "address set anyway; each hook and patch is only applied where its original bytes match.\n",
+                static_cast<unsigned long>(kTimeDateStamp_1_0_15_4_En));
         return true;
     }
 

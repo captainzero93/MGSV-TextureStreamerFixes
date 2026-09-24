@@ -11,7 +11,7 @@ namespace AddressSetRuntime
         Unknown,
         En_1_0_15_3, // day1820
         Jp_1_0_15_3, // day1820
-        En_1_0_15_4, // day3900mgo, SHA256 085c2f82...bb45
+        En_1_0_15_4, // day3900mgo, TimeDateStamp 0x6A4CB898
         Jp_1_0_15_4  // day3800
     };
 
@@ -43,7 +43,7 @@ namespace AddressSetRuntime
         return value;
     }
 
-    GameBuild DetectGameBuild(HMODULE hGame); // by exe SHA256
+    GameBuild DetectGameBuild(HMODULE hGame); // by PE TimeDateStamp, informational
     bool ResolveAddressSet(HMODULE hGame);
     bool HasAllAddresses();
     void InstallCrashHandler();

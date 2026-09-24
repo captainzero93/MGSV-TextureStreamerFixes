@@ -16,7 +16,7 @@
 bool g_HookBatchMode = false;
 
 // Build marker, checked in the binary by the build script
-static const char kBuildMarker[] = "TEXTURESTREAMER,V0_14_20260924";
+static const char kBuildMarker[] = "TEXTURESTREAMER,V0_16_20260924";
 
 namespace
 {
