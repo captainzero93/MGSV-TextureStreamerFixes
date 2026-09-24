@@ -175,7 +175,7 @@ and passes to Create, before IH loads.
 With a texture-heavy file (RTX 4070, budget 4095 MB) the small pool went from 231 to 0 MB free while the large pool
 had plenty. The update state then sat at 0 and every counter froze: a 5 s halt while driving, and the iDroid
 loading forever. With `raiseBudget`, `patchDispatch` and `patchUpgrade` all off it froze the same way (small pool
-0/262 MB, large pool 487/586 MB free), so it is vanilla behaviour.
+0/262 MB, large pool 487/586 MB free), so it is vanilla behaviour (does not matter un-modded).
 
 ### 6.1 Allocation path
 
