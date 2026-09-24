@@ -4,7 +4,7 @@ https://www.nexusmods.com/metalgearsolidvtpp/mods/2622
 
 Infinite Heaven native hook that raises MGSV's texture streamer budgets and handle caps, with VRAM read from the game's own swapchain.
 
-Target: MGSV TPP retail 1.0.15.4 EN, detected by exe SHA256 085c2f82...bb45. Any other exe installs nothing.
+Target: MGSV TPP retail 1.0.15.4 EN
 
 V014: release build, `debugLog = false` by default. V013: logs the game's own per-level block counters. V012: adds the small pool fallback (see HOW_IT_WORKS.md section 6). V011: addresses VERIFIED in Ghidra. Loaded late under IH, so it works through the streamer's own
 runtime reconfigure: once the first Present gives the adapter VRAM, it requests that budget, and the
