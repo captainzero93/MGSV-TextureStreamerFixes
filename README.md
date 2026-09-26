@@ -11,8 +11,7 @@ Full technical write-up (addresses, bytes, decompiles, test results): [RESEARCH.
 MGSV guesses VRAM low, caps its texture budget at 3584 MB and at whatever budget it requested (1800 MB on an
 RTX 4070), drops into a low quality "degrade" mode below 800 MB, and swaps in only 16 higher quality textures per
 frame. The lowest mip of every streamed texture also lives in a small pool fixed at 262 MB when the game starts.
-With texture-heavy mods that pool fills, and the streamer stops: halts of several seconds while driving and an
-iDroid that loads forever. Vanilla does the same.
+With texture-heavy mods that pool fills, and the streamer stops.
 
 The plugin:
 
