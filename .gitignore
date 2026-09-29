@@ -1,0 +1,5 @@
+   x64/
+   TextureStreamer/x64/
+   verified-v*/
+   *.user
+   .vs/
