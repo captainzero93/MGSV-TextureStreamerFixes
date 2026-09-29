@@ -92,7 +92,7 @@
     <ClInclude Include="src\PatternScan.h" />
     <ClInclude Include="src\Settings.h" />
     <ClInclude Include="src\StallMonitor.h" />
-    <ClInclude Include="src\SwapChainVram.h" />
+    <ClInclude Include="src\DeviceVram.h" />
     <ClInclude Include="src\TextureStreamerHooks.h" />
   </ItemGroup>
   <ItemGroup>
@@ -107,7 +107,7 @@
     <ClCompile Include="src\PluginExport.cpp" />
     <ClCompile Include="src\Settings.cpp" />
     <ClCompile Include="src\StallMonitor.cpp" />
-    <ClCompile Include="src\SwapChainVram.cpp" />
+    <ClCompile Include="src\DeviceVram.cpp" />
     <ClCompile Include="src\TextureStreamerHooks.cpp" />
     <ClCompile Include="minhook\src\buffer.c">
       <SDLCheck>false</SDLCheck>

@@ -10,7 +10,6 @@ local this = {
     lockVramMax = false, -- report 4095 MB (uint32 max) instead of the adapter's VRAM
     upgradePerFrame = 32, -- texture upgrades per frame, 16 to 127, game default 16
     -- per-hook switches, for isolating a crash (hookUpdate also needs hookRequestConfig)
-    hookPresent = true,
     hookUpdate = true,
     hookGetAvail = true,
     hookRequestConfig = true,

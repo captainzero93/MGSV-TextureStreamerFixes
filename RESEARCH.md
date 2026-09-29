@@ -1,7 +1,7 @@
 # TextureStreamer research
 
 Target: MGSV TPP retail 1.0.15.4 EN, `mgsvtpp.exe` PE header TimeDateStamp `0x6A4CB898`
-(unmodified exe SHA256 `085c2f82d1c963c40b3d2d55786661dfee2b18cbbf388a710c00fa76c5e9bb45`). Revision V016.
+(unmodified exe SHA256 `085c2f82d1c963c40b3d2d55786661dfee2b18cbbf388a710c00fa76c5e9bb45`). Revision V018.
 
 Addresses are retail 1.0.15.4 EN (preferred base `0x140000000`), read in Ghidra unless another source is given.
 Names in quotes come from the old mgsv_mod source or the 2015 dev decomp. Retail functions are unnamed (`FUN_`).
@@ -34,7 +34,7 @@ It does not touch the handle cap or the create-time sizing (section 7).
    - opens `TextureStreamer.log` beside `mgsvtpp.exe` (previous run kept as `TextureStreamer.prev.log`),
    - reads `plugins\TextureStreamer.lua` as literal `key = value` lines (never run),
    - logs the exe's PE `TimeDateStamp` and `SizeOfImage`. A TimeDateStamp other than `0x6A4CB898` logs a warning and the 1.0.15.4 EN address set is still tried. SizeOfImage is not compared, the anti-tamper wrapper (Denuvo) bloats it,
-   - installs the crash logger, the Present hook, then the streamer hooks and patches. MinHook hooks are queued and applied together.
+   - installs the crash logger, reads VRAM from the game's D3D11 device (4.1), then installs the streamer hooks and patches. MinHook hooks are queued and applied together.
 
 The Core module rewrites its whole loader log with `"w"` for each line, as `InfCore.WriteLog` does, and never
 calls `file:flush`:
@@ -57,21 +57,43 @@ running streamer, not at creation.
 
 ## 4. What it attaches to
 
-### 4.1 Present wrapper (VRAM source)
+### 4.1 VRAM source (game's D3D11 device, no hook)
 
-Found by pattern. The pattern is from IHHook (0x-FADED, commit `0e282a0`).
+The gn device init `FUN_1419f4eb0` calls `D3D11CreateDevice` and keeps the results in globals:
 
-| Address | Bytes | Instruction | Meaning |
-|---|---|---|---|
-| `0x14024CEFC` | `E8 8F 8A 7A 01 85 C0 75 12 38 43 69` | `CALL 0x1419F5990; TEST EAX,EAX; JNZ +0x12; CMP [RBX+0x69],AL` | Pattern `E8 ? ? ? ? 85 C0 75 12 38 43 69`, unique match |
-| `0x1419F5990` | `48 8B 49 18` | `MOV RCX,[RCX+0x18]` | `IDXGISwapChain*` from arg + 0x18 |
-| `0x1419F5994` | `45 33 C0` | `XOR R8D,R8D` | Flags = 0 |
-| `0x1419F5997` | `48 8B 01` | `MOV RAX,[RCX]` | Swapchain vtable |
-| `0x1419F599A` | `48 FF 60 40` | `JMP [RAX+0x40]` | Vtable slot 8, `IDXGISwapChain::Present` |
+| Global | Contents |
+|---|---|
+| `0x142C6B870` | `ID3D11Device*` |
+| `0x142C6B878` | `ID3D11DeviceContext*` |
+| `0x142C6B888` | `IDXGIAdapter1*` the device was created on (passed in, or `IDXGIDevice::GetAdapter` + QI) |
+| `0x142C6B880` | `IDXGIFactory*` from `adapter->GetParent` |
+| `0x142C6B8A0` | `DXGI_ADAPTER_DESC1` from `adapter->GetDesc1` |
 
-On the first call: `GetDevice(IDXGIDevice)` → `GetAdapter` → `DXGI_ADAPTER_DESC.DedicatedVideoMemory` and
+The device global is found by pattern at `0x1419F4F29`, right after the `D3D11CreateDevice` call:
+
+```
+1419f4f29  85 C0                 TEST EAX,EAX
+1419f4f2b  0F 88 CB 00 00 00     JS
+1419f4f31  48 8B 0D 38 69 27 01  MOV RCX,[0x142c6b870]   ; device
+1419f4f38  48 85 C9              TEST RCX,RCX
+1419f4f3b  0F 84 BB 00 00 00     JZ
+1419f4f41  48 83 3D 2F 69 27 01 00  CMP qword [0x142c6b878],0   ; context
+1419f4f49  0F 84 ...             JZ
+```
+
+Pattern `85 C0 0F 88 ? ? ? ? 48 8B 0D ? ? ? ? 48 85 C9 0F 84 ? ? ? ? 48 83 3D ? ? ? ? 00 0F 84`, unique match. The global
+is the rel32 at match + 11, relative to match + 15.
+
+The device exists before IH loads, so VRAM is read in `InitThread` (retried from the streamer update if the global
+is still null): device → `QueryInterface(IDXGIDevice)` → `GetAdapter` → `DXGI_ADAPTER_DESC.DedicatedVideoMemory` and
 `IDXGIAdapter3::QueryVideoMemoryInfo(LOCAL).Budget`, keeping the larger. The game is told `min(that, 0xFFFFFFFF)`,
-or `0xFFFFFFFF` with `lockVramMax = true`. No `CreateDXGIFactory1`.
+or `0xFFFFFFFF` with `lockVramMax = true`. No `CreateDXGIFactory1`, and no hook on any gn::swapchain function, so it
+can't clash with IHHook or other mods hooking Present.
+
+Until V016 VRAM came from a hook on `gn::swapchain::Present` (`0x1419F5990`, pattern `E8 ? ? ? ? 85 C0 75 12 38 43 69`
+from IHHook, swapchain at arg + 0x18). `gn::swapchain::GetCurrentRenderTargetView` (`0x1419F58E0`, found at pattern
+`48 8B F0 48 8B 0B` - 4) was considered: it is only called from swapchain creation (`FUN_140245f80`) and resize
+(`FUN_14024ad80`), both before IH loads, so a hook there would not run until the window is resized.
 
 ### 4.2 Streamer and storage manager hooks
 
@@ -175,7 +197,7 @@ and passes to Create, before IH loads.
 With a texture-heavy file (RTX 4070, budget 4095 MB) the small pool went from 231 to 0 MB free while the large pool
 had plenty. The update state then sat at 0 and every counter froze: a 5 s halt while driving, and the iDroid
 loading forever. With `raiseBudget`, `patchDispatch` and `patchUpgrade` all off it froze the same way (small pool
-0/262 MB, large pool 487/586 MB free), so it is vanilla behaviour.
+0/262 MB, large pool 487/586 MB free), so it is vanilla behaviour (does not matter un-modded).
 
 ### 6.1 Allocation path
 
@@ -255,6 +277,10 @@ init (`FUN_14021d2f0`). It:
 This has finished before IH loads the plugin: the first update always logs a non-null storage manager. None of it
 is hooked. The budget goes through 4.3 and the small pool limit through 6.2.
 
+The old mgsv_mod loaded before this ran and hooked Create, multiplying `total`, the small pool and `storage` by 2–6
+and the two handle values by `handle_multiplier` (default 4). That enlarged the small pool up front, but also sized
+the handle side past the 4880 arrays compiled into the streamer (7.1).
+
 ### 7.3 VRAM above 4 GB
 
 - The budget fields (`+0x30a54..+0x30a70`) are packed 4 bytes apart, so they can't be widened in place. Every read and write across the streamer and storage manager would need rewriting.
@@ -280,6 +306,8 @@ Storage manager   +0x2c GC flags, +0x30/34/38 largest failed request per type
 Texture entry     +0x8 new level, +0xb current level, +0x18/1c/20 size per level,
                   +0x24/28/2c handle per level
 Handles           0xAC91xxxx small pool, 0xAC92xxxx / 0xAC94xxxx large pool
+Globals           0x142C6B870 ID3D11Device*, 0x142C6B878 context, 0x142C6B880 IDXGIFactory*,
+                  0x142C6B888 IDXGIAdapter1*, 0x142C6B8A0 DXGI_ADAPTER_DESC1
 ```
 
 ## 9. Logs
@@ -293,7 +321,7 @@ the applied budget and any crash report. With `debugLog = true` it adds:
 
 - `[Usage]` every 5 s: update state, storage, cache budget, degrade flag, small/large pool free
   (total - (allocated blocks + 1) * block size, the same check AllocBlock uses), and the two 4880-entry list counts.
-  `[Usage] STALL` when an update takes over 50 ms or two Presents are more than 250 ms apart.
+  `[Usage] STALL` when an update takes over 50 ms or two streamer updates are more than 250 ms apart.
 - `[Blocks]` after each `[Usage]`:
   - `shown lv0/1/2`: `+0x30a74/78/7c`, bytes by level shown (`0x14021F9A0`, `0x140222010`). Not pool usage.
   - `allocated lvN count (MB)`: `+0x3efa0..b4`. Level 0 includes blocks moved to the large pool.
@@ -301,37 +329,36 @@ the applied budget and any crash report. With `debugLog = true` it adds:
   - `full` / `gc wait`: AllocBlock `0xFFFFFFFF` / `0xFFFFFFFE` per level since start, counted in the hook before any retry.
   - `small->large N (M MB, failed F)`: fallback count, total MB requested (not reduced on free), large pool refusals.
 - `[Storage] Small pool full, N KB placed in the large pool` for the first 5 fallbacks, then every 500th.
-- Boot log: tick, thread id, step from `InitThread settings loaded` on, the first call of each hook, the DXGI steps.
+- Boot log: tick, thread id, step from `InitThread settings loaded` on, the first call of each hook.
   The last line before it stops is where a crash happened.
 
-To isolate a crash, turn off one at a time: `hookPresent`, `hookUpdate`, `hookGetAvail`, `hookRequestConfig`,
+To isolate a crash, turn off one at a time: `hookUpdate`, `hookGetAvail`, `hookRequestConfig`,
 `patchDispatch`, `patchUpgrade`, `smallPoolFallback`. `hookUpdate` also needs `hookRequestConfig`.
 
 Expected `TextureStreamer.log`:
 
-1. `[DLL] InitThread started. TEXTURESTREAMER,V0_16_20260924`
+1. `[DLL] InitThread started. TEXTURESTREAMER,V0_18_20260928`
 2. `[Settings] Loaded ...`, then one line with every setting
 3. `[AddressSet] mgsvtpp.exe TimeDateStamp 0x6A4CB898 SizeOfImage 0x...`, `Selected EN 1.0.15.4 address set.`
 4. `[CRASH] Unhandled-exception crash logger installed.`
-5. `[Vram] Present pattern @0x14024CEFC -> gn::swapchain::Present 0x1419F5990`, `[Hook] Present: OK`
+5. `[Vram] Device pattern @0x1419F4F29 -> device global 0x142C6B870`, then the adapter line and `[Vram] Resolved: N MB, reported to game M MB`
 6. For each of the four hooks in 4.2: `@0x... bytes [...] matches`, `: OK`
 7. `[Patch] Update budget clamps: applied`, `[Patch] doListupChangegraders upgrade per frame: applied`, `[Streamer] Upgrade per frame: 32 (was 16)`
 8. `[DLL] MH_ApplyQueued -> 0`, `[DLL] InitThread done.`
 
-Then, in game (9 and 10 in either order):
+Then, in game:
 
-9. `[Vram] Adapter '...' dedicated=... budget=... using=... MB`, `[Vram] Resolved on first Present: N MB, reported to game M MB`
-10. `[Streamer] First update: streamer=... tsm=... (storage created before plugin load)`
-11. `[Streamer] Requested budget N MB (was M MB) -> pending`
-12. `[Streamer] Applied config ... MB: vramSize ..., clampedStore ..., storage ..., cacheBudget ..., degradeFlag ...`.
+9. `[Streamer] First update: streamer=... tsm=... (storage created before plugin load)`
+10. `[Streamer] Requested budget N MB (was M MB) -> pending`
+11. `[Streamer] Applied config ... MB: vramSize ..., clampedStore ..., storage ..., cacheBudget ..., degradeFlag ...`.
     The first is logged on the first update, so it can show the game's own value before the request lands.
 
 Reading it:
 
 - `Applied config N MB` with the requested N: the reconfigure landed. `degradeFlag` 2 is normal, 1 is degrade mode (cache budget 0).
-- Line 11 but no `Applied config N MB`: the request is pending. Either the gate in 4.3 is not met, or the storage allocation failed and fell back.
+- Line 10 but no `Applied config N MB`: the request is pending. Either the gate in 4.3 is not met, or the storage allocation failed and fell back.
 - `Budget already N MB, no request`: the game's config was already at or above VRAM.
 - `MISMATCH` or `SKIPPED`: nothing was written at that site.
 - `WARNING: exe is not the target 1.0.15.4 EN build`: different TimeDateStamp. Only the hooks and patches that say `matches` were applied.
-- No `[Vram] Resolved`: the Present hook never ran.
+- No `[Vram] Resolved`: the device global was null or unreadable, so the game's own budget is kept.
 - `loadlib failed` in the loader log while `TextureStreamer.log` shows the hooks: the DLL is loaded and working (everything runs from DllMain). Seen once, cause unknown.

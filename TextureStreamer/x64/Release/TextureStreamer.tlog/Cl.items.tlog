@@ -9,7 +9,7 @@ F:\TextureStreamerFix\src\PatternScan.cpp;F:\TextureStreamerFix\TextureStreamer\
 F:\TextureStreamerFix\src\PluginExport.cpp;F:\TextureStreamerFix\TextureStreamer\x64\Release\PluginExport.obj
 F:\TextureStreamerFix\src\Settings.cpp;F:\TextureStreamerFix\TextureStreamer\x64\Release\Settings.obj
 F:\TextureStreamerFix\src\StallMonitor.cpp;F:\TextureStreamerFix\TextureStreamer\x64\Release\StallMonitor.obj
-F:\TextureStreamerFix\src\SwapChainVram.cpp;F:\TextureStreamerFix\TextureStreamer\x64\Release\SwapChainVram.obj
+F:\TextureStreamerFix\src\DeviceVram.cpp;F:\TextureStreamerFix\TextureStreamer\x64\Release\DeviceVram.obj
 F:\TextureStreamerFix\src\TextureStreamerHooks.cpp;F:\TextureStreamerFix\TextureStreamer\x64\Release\TextureStreamerHooks.obj
 F:\TextureStreamerFix\minhook\src\buffer.c;F:\TextureStreamerFix\TextureStreamer\x64\Release\buffer.obj
 F:\TextureStreamerFix\minhook\src\hook.c;F:\TextureStreamerFix\TextureStreamer\x64\Release\hook.obj

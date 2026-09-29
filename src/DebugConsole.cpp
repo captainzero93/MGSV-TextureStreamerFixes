@@ -3,11 +3,25 @@
 
 #include "DebugConsole.h"
 #include "Settings.h"
-#include "SwapChainVram.h"
+#include "DeviceVram.h"
 #include "TextureStreamerHooks.h"
 
-// DgTextureStreamer +0x30a54..0x30a70, +0x30a80 and +0x26388: VERIFIED in FUN_14021dee0 and FUN_14021a460 (retail 1.0.15.4 EN).
-// +0x30a74..0x30a7c, TSM +0x28/+0x40/+0x48 and the +0x18 counts: from the previous mgsv_mod source, UNVERIFIED
+// Offsets: see RESEARCH.md section 8 (retail 1.0.15.4 EN).
+static unsigned int PoolFreeMb(uintptr_t pool, unsigned int* totalMb)
+{
+    if (!pool)
+    {
+        *totalMb = 0;
+        return 0;
+    }
+    const unsigned int total = *reinterpret_cast<unsigned int*>(pool + 0x8);
+    const unsigned int block = *reinterpret_cast<unsigned int*>(pool + 0xC);
+    const unsigned int blocks = *reinterpret_cast<unsigned int*>(pool + 0x18);
+    *totalMb = total >> 20;
+    const unsigned long long used = static_cast<unsigned long long>(blocks + 1) * block;
+    return used >= total ? 0 : static_cast<unsigned int>((total - used) >> 20);
+}
+
 static void PrintStreamer(unsigned char* s)
 {
     auto ru32 = [&](int off) { return *reinterpret_cast<unsigned int*>(s + off); };
@@ -18,23 +32,24 @@ static void PrintStreamer(unsigned char* s)
     const uintptr_t tsm = rptr(0x26388);
     if (tsm)
     {
-        // retail 1.0.15.4 EN: TSM+0x60 applied config, +0x68 pending (FUN_1402a91d0)
         printf(
             "  config applied: %u MB   pending: %u MB\n",
             *reinterpret_cast<unsigned int*>(tsm + 0x60) >> 20,
             *reinterpret_cast<unsigned int*>(tsm + 0x68) >> 20);
-        const unsigned int cap = *reinterpret_cast<unsigned int*>(tsm + 0x28);
-        const uintptr_t ba0 = *reinterpret_cast<uintptr_t*>(tsm + 0x40);
-        const uintptr_t ba1 = *reinterpret_cast<uintptr_t*>(tsm + 0x48);
-        const unsigned int used0 = ba0 ? *reinterpret_cast<unsigned int*>(ba0 + 0x18) : 0;
-        const unsigned int used1 = ba1 ? *reinterpret_cast<unsigned int*>(ba1 + 0x18) : 0;
-        const unsigned int total = used0 + used1;
-        printf("  handles in use:        %u / %u  (%.1f%%)\n", total, cap, cap ? (total * 100.0f / cap) : 0.f);
-        printf("    type0: %u   type1: %u\n", used0, used1);
+        unsigned int smallTotal = 0;
+        unsigned int largeTotal = 0;
+        const unsigned int smallFree = PoolFreeMb(*reinterpret_cast<uintptr_t*>(tsm + 0x40), &smallTotal);
+        const unsigned int largeFree = PoolFreeMb(*reinterpret_cast<uintptr_t*>(tsm + 0x48), &largeTotal);
+        printf("  small pool free: %u / %u MB   large pool free: %u / %u MB\n", smallFree, smallTotal, largeFree, largeTotal);
+        // one level 0 block per streamed texture; the streamer tracks at most 4880
+        const unsigned int textures = ru32(0x3efa0);
+        printf("  streamed textures: %u / 4880  (%.1f%%)\n", textures, textures * 100.0f / 4880.0f);
+        const TextureStreamerState& st = GetTextureStreamerState();
+        printf("  small->large: %u (failed %u)\n", st.smallFallbacks, st.smallFallbackFails);
     }
     else
     {
-        printf("  handles: TSM not ready\n");
+        printf("  storage manager not ready\n");
     }
 
     static const struct
@@ -44,7 +59,7 @@ static void PrintStreamer(unsigned char* s)
     } kFields[] = {
         { 0x30a54, "vramSize" },     { 0x30a58, "baseReservation" },  { 0x30a5c, "streamingOverhead" },  { 0x30a60, "storageMinusOH" },
         { 0x30a64, "clampedStore" }, { 0x30a68, "baseReservation2" }, { 0x30a6c, "streamingOverhead2" }, { 0x30a70, "textureCacheBudget" },
-        { 0x30a74, "type0 used" },   { 0x30a78, "type1 used" },       { 0x30a7c, "type2 used" },
+        { 0x30a74, "shown lv0" },    { 0x30a78, "shown lv1" },        { 0x30a7c, "shown lv2" },
     };
 
     printf("\n");
@@ -73,7 +88,7 @@ static DWORD WINAPI DebugConsoleThread(LPVOID)
         if (Vram::IsResolved())
             printf("  adapter VRAM:   %llu MB (reported %u MB)\n", Vram::GetBytes() >> 20, Vram::GetReported() >> 20);
         else
-            printf("  adapter VRAM:   waiting for first Present\n");
+            printf("  adapter VRAM:   waiting for the game device\n");
         if (st.requestedSize)
             printf("  requested:      %u MB\n", st.requestedSize >> 20);
         else

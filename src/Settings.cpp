@@ -58,8 +58,6 @@ static void ApplyValue(const std::string& key, const std::string& value)
         ok = ParseBool(value, s.patchUpgrade);
     else if (key == "smallPoolFallback")
         ok = ParseBool(value, s.smallPoolFallback);
-    else if (key == "hookPresent")
-        ok = ParseBool(value, s.hookPresent);
     else if (key == "hookUpdate")
         ok = ParseBool(value, s.hookUpdate);
     else if (key == "hookGetAvail")
@@ -121,7 +119,7 @@ void LoadSettings()
         s.upgradePerFrame = 127;
 
     Log("[Settings] debugWindow=%d debugLog=%d raiseBudget=%d patchDispatch=%d patchUpgrade=%d smallPoolFallback=%d lockVramMax=%d upgradePerFrame=%d "
-        "hookPresent=%d hookUpdate=%d hookGetAvail=%d hookRequestConfig=%d\n",
+        "hookUpdate=%d hookGetAvail=%d hookRequestConfig=%d\n",
         (int)s.debugWindow,
         (int)s.debugLog,
         (int)s.raiseBudget,
@@ -130,7 +128,6 @@ void LoadSettings()
         (int)s.smallPoolFallback,
         (int)s.lockVramMax,
         s.upgradePerFrame,
-        (int)s.hookPresent,
         (int)s.hookUpdate,
         (int)s.hookGetAvail,
         (int)s.hookRequestConfig);

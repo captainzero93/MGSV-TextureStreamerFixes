@@ -1,10 +1,8 @@
-# FOX Engine Texture Streaming Fix
+# FOX Engine Texture Streaming / Budget / Pop Fixes
 
 Infinite Heaven plugin for MGSV: The Phantom Pain (Steam 1.0.15.4 EN). It raises the texture streaming budget
-using real VRAM read from the game's swapchain, removes the 3584 MB cap and the forced degrade mode, loads
+using real VRAM read from the game's own D3D11 device, removes the 3584 MB cap and the forced degrade mode, loads
 higher quality textures faster, and fixes the small texture pool stall. It leaves the 4880 handle cap alone.
-
-Current revision: V016 (`TEXTURESTREAMER,V0_16_20260924`).
 
 Full technical write-up (addresses, bytes, decompiles, test results): [RESEARCH.md](RESEARCH.md).
 
@@ -13,12 +11,11 @@ Full technical write-up (addresses, bytes, decompiles, test results): [RESEARCH.
 MGSV guesses VRAM low, caps its texture budget at 3584 MB and at whatever budget it requested (1800 MB on an
 RTX 4070), drops into a low quality "degrade" mode below 800 MB, and swaps in only 16 higher quality textures per
 frame. The lowest mip of every streamed texture also lives in a small pool fixed at 262 MB when the game starts.
-With texture-heavy mods that pool fills, and the streamer stops: halts of several seconds while driving and an
-iDroid that loads forever. Vanilla does the same.
+With texture-heavy mods that pool fills, and the streamer stops.
 
 The plugin:
 
-- reads your real VRAM from the adapter the game renders on (swapchain → device → adapter),
+- reads your real VRAM from the adapter the game renders on (the game's D3D11 device → adapter, no Present hook),
 - asks the streamer to resize itself through the game's own reconfigure path,
 - removes the 3584 MB cap and the two forced-degrade checks,
 - raises texture upgrades per frame from 16 to 32,
@@ -44,7 +41,7 @@ With the game closed, copy into the game folder (the one with `mgsvtpp.exe`):
 - `plugins\TextureStreamer.dll`
 - `plugins\TextureStreamer.lua`
 
-Or install the .mgsv with SnakeBite. IH loads it on startup.
+Or install the .mgsv with SnakeBite. IH loads it on startup. https://www.nexusmods.com/metalgearsolidvtpp/mods/2622 
 
 ## Settings
 
@@ -53,14 +50,13 @@ Or install the .mgsv with SnakeBite. IH loads it on startup.
 | Key | Default | Effect |
 |---|---|---|
 | `debugLog` | `false` | Pool usage every 5 s, stall and fallback lines, `TextureStreamer_boot.log`. For bug reports |
-| `debugWindow` | `false` | Live debug console (windowed or borderless only) |
 | `raiseBudget` | `true` | `false` leaves the game's budget alone (monitor only) |
 | `patchDispatch` | `true` | Remove the 3584 MB cap and forced degrade |
 | `patchUpgrade` | `true` | Raise upgrades per frame to `upgradePerFrame` |
 | `upgradePerFrame` | `32` | 16 to 127, game default 16 |
 | `smallPoolFallback` | `true` | Small pool full: use the large pool instead of stalling |
 | `lockVramMax` | `false` | Report 4095 MB instead of the adapter's VRAM |
-| `hookPresent`, `hookUpdate`, `hookGetAvail`, `hookRequestConfig` | `true` | Per-hook switches for isolating a crash. `hookUpdate` needs `hookRequestConfig` |
+| `hookUpdate`, `hookGetAvail`, `hookRequestConfig` | `true` | Per-hook switches for isolating a crash. `hookUpdate` needs `hookRequestConfig` |
 
 ## Logs and bug reports
 
@@ -78,13 +74,12 @@ game and send `TextureStreamer.log`. RESEARCH.md section 9 explains every line.
 
 ## Build
 
-Visual Studio 2022 or later, x64. Run `BUILD_TEXTURESTREAMER_V016_CHECKED.cmd`. It rebuilds Release x64, checks
-the version marker is in the DLL, and stages the install layout in `verified-v016\`. MinHook is vendored in
+Visual Studio 2022 or later, x64. Run `BUILD_TEXTURESTREAMER_V018_CHECKED.cmd`. It rebuilds Release x64, checks
+the version marker is in the DLL, and stages the install layout in `verified-v018\`. MinHook is vendored in
 `minhook\` (TsudaKageyu/minhook `8af6b4a`).
 
 ## Credits
 
-- ClearEdge: the swapchain route for reading VRAM
-- IHHook (0x-FADED): the Present pattern
+- ClearEdge: reading VRAM from the game's own device and adapter instead of a new DXGI factory
 - Infinite Heaven and MGSV_HookSample: plugin loading and project base
 - MinHook (TsudaKageyu)

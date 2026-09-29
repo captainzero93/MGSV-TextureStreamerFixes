@@ -6,28 +6,27 @@
 
 #include "BuiltInModules.h"
 #include "FeatureModule.h"
-#include "SwapChainVram.h"
+#include "DeviceVram.h"
 #include "TextureStreamerHooks.h"
 
 namespace
 {
-    class SwapChainVramModule final : public IFeatureModule
+    class DeviceVramModule final : public IFeatureModule
     {
     public:
         const char* GetName() const override
         {
-            return "SwapChainVram";
+            return "DeviceVram";
         }
 
         bool Install(HMODULE hGame) override
         {
             UNREFERENCED_PARAMETER(hGame);
-            return Install_SwapChainVram_Hook();
+            return Install_DeviceVram();
         }
 
         void Uninstall() override
         {
-            Uninstall_SwapChainVram_Hook();
         }
     };
 
@@ -54,7 +53,7 @@ namespace
 
 void RegisterBuiltInFeatureModules()
 {
-    static SwapChainVramModule s_SwapChainVramModule;
+    static DeviceVramModule s_DeviceVramModule;
     static TextureStreamerModule s_TextureStreamerModule;
 
     static std::once_flag s_Once;
@@ -62,7 +61,7 @@ void RegisterBuiltInFeatureModules()
         s_Once,
         []()
         {
-            FeatureModuleRegistry::Instance().Register(&s_SwapChainVramModule);
+            FeatureModuleRegistry::Instance().Register(&s_DeviceVramModule);
             FeatureModuleRegistry::Instance().Register(&s_TextureStreamerModule);
         });
 }

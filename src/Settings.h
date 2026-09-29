@@ -10,7 +10,6 @@ struct Settings
     bool patchUpgrade = true;      // upgrades per frame
     bool smallPoolFallback = true; // failed small pool allocations retry in the large pool
     // per-hook switches, for isolating a crash
-    bool hookPresent = true;
     bool hookUpdate = true;
     bool hookGetAvail = true;
     bool hookRequestConfig = true;

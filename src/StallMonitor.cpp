@@ -11,12 +11,12 @@
 namespace
 {
     constexpr double kUpdateStallMs = 50.0; // streamer update slower than this is logged
-    constexpr double kFrameGapMs = 250.0;   // gap between Presents longer than this is logged
+    constexpr double kFrameGapMs = 250.0;   // gap between streamer updates longer than this is logged
     constexpr double kSnapshotEveryMs = 5000.0;
 
     std::atomic<uint8_t*> g_Streamer{ nullptr };
     std::atomic<int64_t> g_UpdateStart{ 0 }; // QPC tick while an update runs, 0 otherwise
-    int64_t g_LastPresent = 0;
+    int64_t g_LastUpdate = 0;
     int64_t g_LastSnapshot = 0;
     double g_TicksPerMs = 0.0;
 
@@ -122,13 +122,21 @@ static void LogSnapshot(const char* reason)
         ts.smallFallbackFails);
 }
 
-// All three do nothing unless debugLog is set.
+// Both do nothing unless debugLog is set.
 void StallMonitor_UpdateBegin(uint8_t* streamer)
 {
     if (!GetSettings().debugLog)
         return;
     g_Streamer.store(streamer);
-    g_UpdateStart.store(Now());
+    const int64_t now = Now();
+    if (g_LastUpdate && Ms(g_LastUpdate, now) > kFrameGapMs)
+    {
+        char reason[64];
+        snprintf(reason, sizeof(reason), "STALL %.0f ms between streamer updates", Ms(g_LastUpdate, now));
+        LogSnapshot(reason);
+    }
+    g_LastUpdate = now;
+    g_UpdateStart.store(now);
 }
 
 void StallMonitor_UpdateEnd(uint8_t* streamer)
@@ -153,26 +161,4 @@ void StallMonitor_UpdateEnd(uint8_t* streamer)
         g_LastSnapshot = end;
         LogSnapshot("periodic");
     }
-}
-
-void StallMonitor_OnPresent()
-{
-    if (!GetSettings().debugLog)
-        return;
-    const int64_t now = Now();
-    if (g_LastPresent)
-    {
-        const double gap = Ms(g_LastPresent, now);
-        if (gap > kFrameGapMs)
-        {
-            const int64_t updateStart = g_UpdateStart.load();
-            char reason[96];
-            if (updateStart)
-                snprintf(reason, sizeof(reason), "STALL frame gap %.0f ms, streamer update running for %.0f ms", gap, Ms(updateStart, now));
-            else
-                snprintf(reason, sizeof(reason), "STALL frame gap %.0f ms, streamer update not running", gap);
-            LogSnapshot(reason);
-        }
-    }
-    g_LastPresent = now;
 }

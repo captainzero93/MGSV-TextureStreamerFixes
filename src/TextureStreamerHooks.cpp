@@ -6,7 +6,7 @@
 #include "HookUtils.h"
 #include "Settings.h"
 #include "StallMonitor.h"
-#include "SwapChainVram.h"
+#include "DeviceVram.h"
 #include "TextureStreamerHooks.h"
 #include "log.h"
 
@@ -126,6 +126,7 @@ static void __fastcall hkUpdate(void* streamer)
             const void* tsm = *reinterpret_cast<void**>(static_cast<uint8_t*>(streamer) + kStreamerTsm);
             Log("[Streamer] First update: streamer=%p tsm=%p%s\n", streamer, tsm, tsm ? " (storage created before plugin load)" : "");
         }
+        Vram::TryResolve();
         RequestVramBudget(streamer);
     }
     if (first)
@@ -164,7 +165,7 @@ static bool __fastcall hkRequestConfig(void* tsm, uint32_t* config)
     return g_OrigRequestConfig(tsm, reinterpret_cast<uint32_t*>(&local));
 }
 
-// Game's own value until the first Present has resolved VRAM.
+// Game's own value until VRAM is known.
 static uint64_t __fastcall hkGetAvail()
 {
     static bool traced = false;
